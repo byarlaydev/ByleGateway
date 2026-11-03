@@ -1,5 +1,7 @@
 # Integrate an application
 
+For an AI-assisted integration, open **Integration → Copy integration prompt** in the owner dashboard and paste it into the agent working on your app. Preview the full contract before copying. The prompt uses the current dashboard origin (the Railway deployment serves the dashboard and public API together) and contains no secrets. If you run separate dashboard/API domains, replace `GATEWAY_URL` with the public API origin. Supply the app API key and webhook signing secret through your app's backend secret store separately.
+
 ## 1. Register and protect your key
 
 Connect to the owner dashboard, add an application, and copy its one-time API key. Keep it in your app backend’s secret store:

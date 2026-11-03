@@ -24,6 +24,7 @@ import {
 } from "@phosphor-icons/react";
 import QRCode from "qrcode";
 import { AppTools, PaymentTimeline, SetupChecklist } from "./gateway-tools";
+import { integrationPrompt } from "../lib/integration-prompt";
 import type { App, Payment } from "./models";
 const nav = [
   { label: "Overview", icon: SquaresFour },
@@ -70,6 +71,8 @@ export default function Dashboard({ now }: { now: number }) {
   const [newKey, setNewKey] = useState("");
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+  const [gatewayOrigin, setGatewayOrigin] = useState("");
+  useEffect(() => setGatewayOrigin(window.location.origin), []);
   const [busy, setBusy] = useState(false);
   const [pageIndex, setPageIndex] = useState(1);
   const [report, setReport] = useState<{
@@ -773,6 +776,36 @@ export default function Dashboard({ now }: { now: number }) {
           )}
           {page === "Integration" && (
             <section className="integration-grid reveal">
+              <div className="panel guide agent-prompt">
+                <div className="card-heading">
+                  <div>
+                    <span className="step">INTEGRATE WITH AN AI AGENT</span>
+                    <h2>Give your agent the payment contract.</h2>
+                  </div>
+                  <button
+                    className="secondary"
+                    disabled={!gatewayOrigin}
+                    onClick={() => copy(integrationPrompt(gatewayOrigin))}
+                  >
+                    <Copy size={14} /> Copy integration prompt
+                  </button>
+                </div>
+                <p>
+                  Paste this into the AI agent working on your app. It includes
+                  this gateway’s URL, payment API, webhook verification, and
+                  testing requirements. Supply your app’s keys separately through
+                  its backend secrets.
+                </p>
+                <details>
+                  <summary>Preview prompt</summary>
+                  <textarea
+                    aria-label="AI agent integration prompt"
+                    readOnly
+                    rows={16}
+                    value={gatewayOrigin ? integrationPrompt(gatewayOrigin) : ""}
+                  />
+                </details>
+              </div>
               <div className="panel guide">
                 <span className="step">01 / CONNECT</span>
                 <h2>From your server, with a key.</h2>

@@ -881,6 +881,20 @@ footer > span {
 .guide {
   padding: 30px;
 }
+.agent-prompt {
+  grid-column: 1 / -1;
+}
+.agent-prompt .card-heading {
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.agent-prompt textarea {
+  width: 100%;
+  margin-top: 16px;
+  padding: 16px;
+  resize: vertical;
+  font: 12px/1.7 monospace;
+}
 .step {
   font-size: 9px;
   letter-spacing: 1.5px;
