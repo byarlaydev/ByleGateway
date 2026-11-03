@@ -17,12 +17,13 @@ Secrets are stored as Railway service variables. Ignored local `.env.railway*` f
 
 ## Release updates
 
-Link the CLI with `railway link` and select ByleGateway / production. Push reviewed changes to GitHub. Deploy the migration service first and confirm its logs say `Database migrated; payment history preserved and runtime permissions applied.` A successful migration exits normally; it is not a continuously running web service.
+Link the CLI with `railway link` and select ByleGateway / production. The API, web, and gateway automatically deploy pushes to GitHub's `main` branch. The migration service is intentionally manual. For schema changes, deploy migrations from the reviewed local checkout **before pushing** the application update, and confirm its logs say `Database migrated; payment history preserved and runtime permissions applied.` A successful migration exits normally; it is not a continuously running web service. Keep migrations compatible with the currently running release.
 
 ```sh
 railway up --service migrate --detach
 railway logs --service migrate --lines 50
-# Only after migration succeeds:
+# After migration succeeds, push to main for automatic deployment.
+# Manual deployment is also available:
 railway up --service api --detach
 railway up --service web --detach
 railway up --service gateway --detach
