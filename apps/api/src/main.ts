@@ -23,7 +23,7 @@ import type { Request, Response } from "express";
 import type { RawBodyRequest } from "@nestjs/common";
 import { db } from "./db";
 import { assertSame, equal, hash, paymentInput, publicHttpsOrigin, verifyCallback } from "./rules";
-import { provider, providerMode, upstream } from "./provider";
+import { provider, providerMode, upstream, providerReference, gatewayReference } from "./provider";
 import { checkout, event, find, reconcile, uuid } from "./payments";
 import { startWorker } from "./worker";
 import { seal, approveWebhookUrl } from "./webhooks";
@@ -462,7 +462,7 @@ class GatewayController {
     // Preserve CREATING after an ambiguous failure: generating another order could charge twice.
     const result = await upstream(() =>
       sdk.pay({
-        orderId: id,
+        orderId: providerReference(id),
         amount: input.amount,
         currency: "MMK",
         customMessage: input.description,
@@ -479,7 +479,7 @@ class GatewayController {
       throw error;
     });
     if (
-      result.orderId !== id ||
+      result.orderId !== providerReference(id) ||
       Number(result.amount) !== input.amount ||
       !result.qr
     ) {
@@ -530,7 +530,7 @@ class GatewayController {
     // Never trust callback status: retrieve the authoritative record through the signed provider API.
     if (typeof body?.orderId !== "string")
       throw new BadRequestException("Missing orderId");
-    uuid(body.orderId);
+    const id = gatewayReference(body.orderId);
     if (
       !req.rawBody ||
       !verifyCallback(
@@ -541,9 +541,9 @@ class GatewayController {
       )
     )
       throw new UnauthorizedException("Invalid provider signature");
-    await find(body.orderId);
-    await event(body.orderId, "callback.verified");
-    await reconcile(body.orderId);
+    await find(id);
+    await event(id, "callback.verified");
+    await reconcile(id);
     return { received: true };
   }
 }

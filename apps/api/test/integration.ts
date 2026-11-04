@@ -1,3 +1,4 @@
+import { providerReference } from "../src/provider";
 import { createServer } from "node:http";
 import { createHmac, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -68,6 +69,7 @@ async function run() {
         currency: "MMK",
         qr: "TEST-EMVCO-NOT-A-REAL-PAYMENT",
       };
+      assert.match(body.orderId, /^[a-f0-9]{32}$/);
       records.set(body.orderId, record);
       res.end(JSON.stringify(record));
       return;
@@ -210,7 +212,7 @@ async function run() {
     assert.equal(new Set(duplicate.map((r) => r.body.id)).size, 1);
     assert.equal(creates, 1);
     const payment = duplicate[0].body;
-    assert.ok(records.has(payment.id));
+    assert.ok(records.has(providerReference(payment.id)));
     assert.equal(
       (
         await request("/v1/payments", a.body.key, "POST", {
@@ -242,7 +244,7 @@ async function run() {
     assert.equal(other.status, 201);
     assert.notEqual(other.body.id, payment.id);
     const callback = {
-      orderId: payment.id,
+      orderId: providerReference(payment.id),
       status: "SUCCESS",
       amount: 25000,
       currency: "MMK",
@@ -281,7 +283,7 @@ async function run() {
     );
     assert.equal(hook.status, 201);
     assert.ok(hook.body.secret.startsWith("whsec_"));
-    records.get(payment.id)!.status = "SUCCESS";
+    records.get(providerReference(payment.id))!.status = "SUCCESS";
     assert.equal(
       (await request("/webhooks/mmpay", "", "POST", callback, headers)).status,
       200,
@@ -290,7 +292,7 @@ async function run() {
       (await request(`/v1/payments/${payment.id}`, a.body.key)).body.status,
       "SUCCESS",
     );
-    records.get(payment.id)!.status = "PENDING";
+    records.get(providerReference(payment.id))!.status = "PENDING";
     await request("/webhooks/mmpay", "", "POST", callback, headers);
     assert.equal(
       (await request(`/v1/payments/${payment.id}`, a.body.key)).body.status,
@@ -399,7 +401,7 @@ async function run() {
     assert.ok(
       attention.body.payments.some((p: { id: string }) => p.id === payment.id),
     );
-    records.get(other.body.id)!.status = "SUCCESS";
+    records.get(providerReference(other.body.id))!.status = "SUCCESS";
     await db.query("UPDATE payments SET next_check_at=now() WHERE id=$1", [
       other.body.id,
     ]);
@@ -444,7 +446,7 @@ async function run() {
       (await request(`/v1/payments/${payment.id}`, a.body.key)).status,
       200,
     );
-    records.get(payment.id)!.amount = 1;
+    records.get(providerReference(payment.id))!.amount = 1;
     assert.equal(
       (await request(`/v1/payments/${payment.id}/refresh`, a.body.key, "POST"))
         .status,

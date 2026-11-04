@@ -7,7 +7,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { db } from "./db";
 import { validTransition } from "./rules";
-import { provider, upstream } from "./provider";
+import { provider, upstream, providerReference } from "./provider";
 export const uuid = (id: string) => {
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
@@ -65,7 +65,7 @@ export async function reconcile(id: string, appId?: string) {
 async function reconcilePayment(id: string, appId?: string) {
   const payment = await find(id, appId);
   const result = await upstream(() =>
-    provider().get({ orderId: payment.id, nonce: Date.now().toString() }),
+    provider().get({ orderId: providerReference(payment.id), nonce: Date.now().toString() }),
   );
   if (
     ![
@@ -80,7 +80,7 @@ async function reconcilePayment(id: string, appId?: string) {
     throw new ServiceUnavailableException("Unknown provider payment status");
   if (
     !result ||
-    result.orderId !== payment.id ||
+    result.orderId !== providerReference(payment.id) ||
     Number(result.amount) !== Number(payment.amount) ||
     ("currency" in result && result.currency !== "MMK")
   )

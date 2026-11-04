@@ -41,7 +41,7 @@ export async function createPayment(order) {
 }
 ```
 
-Amounts are integers in whole kyat: 25000 means 25,000 MMK. A repeated order with identical details returns the existing record; changing its amount or description returns 409. The gateway uses its own UUID at the provider, avoiding collisions between your apps.
+Amounts are integers in whole kyat: 25000 means 25,000 MMK. A repeated order with identical details returns the existing record; changing its amount or description returns 409. The gateway sends its own UUID without hyphens (32 hexadecimal characters) to the provider, avoiding collisions between your apps. Public gateway payment IDs keep their UUID format.
 
 ## 3. Open hosted checkout
 
