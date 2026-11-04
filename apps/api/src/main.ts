@@ -381,7 +381,7 @@ class GatewayController {
     const {
       rows: [payment],
     } = await db.query(
-      `SELECT p.order_id,p.amount,p.currency,p.status,CASE WHEN p.checkout_expires_at>now() AND p.status IN ('CREATING','PENDING') THEN p.qr ELSE NULL END AS qr,p.description,p.checkout_expires_at,a.name AS app_name FROM payments p JOIN apps a ON a.id=p.app_id WHERE p.checkout_token=$1`,
+      `SELECT p.order_id,p.amount,p.currency,p.status,CASE WHEN LEAST(p.checkout_expires_at,p.created_at+interval '15 minutes')>now() AND p.status IN ('CREATING','PENDING') THEN p.qr ELSE NULL END AS qr,p.description,LEAST(p.checkout_expires_at,p.created_at+interval '15 minutes') AS checkout_expires_at,a.name AS app_name FROM payments p JOIN apps a ON a.id=p.app_id WHERE p.checkout_token=$1`,
       [token],
     );
     if (!payment) throw new NotFoundException();

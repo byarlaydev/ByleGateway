@@ -138,3 +138,5 @@ The gateway automatically checks pending/creating payments. It does not regenera
 Use separate sandbox credentials/deployment/database. Create a payment from your app, open hosted checkout, simulate payment in MyanMyanPay’s merchant dashboard, verify a signed callback, watch gateway status become SUCCESS, and confirm your app receives a signed notification and fulfills exactly once. Replay a notification to test deduplication. Temporarily return 503 from your app endpoint, restore it, and verify retry recovery.
 
 Only after this passes should you configure live credentials in a separate deployment and perform a controlled live transaction. The automated local mock test cannot establish merchant connectivity or approval.
+
+Hosted checkout uses the supplied MMQR logo unchanged, attribution below the unmodified QR payload, a server-anchored 15-minute display timer and a PNG download. Refresh and visibility recovery only fetch the same capability URL; they never create payments. Cached display data is scoped to the checkout token in session storage and QR display waits for current server verification. Closing or timing out the display is not cancellation.

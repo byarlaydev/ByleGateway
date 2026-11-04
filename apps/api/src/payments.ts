@@ -32,6 +32,7 @@ export function checkout(payment: Record<string, any>) {
   const { checkout_token, ...record } = payment;
   return {
     ...record,
+    checkout_expires_at: new Date(Math.min(new Date(payment.checkout_expires_at).getTime(), new Date(payment.created_at).getTime() + 15 * 60000)).toISOString(),
     checkout_url: checkout_token
       ? `${(process.env.CHECKOUT_ORIGIN || "http://127.0.0.1:3000").replace(/\/$/, "")}/checkout/${checkout_token}`
       : null,

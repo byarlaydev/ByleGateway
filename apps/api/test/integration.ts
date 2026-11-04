@@ -305,6 +305,12 @@ async function run() {
     );
     assert.equal(publicPayment.status, 200);
     assert.equal(publicPayment.body.amount, "25000");
+    const {rows:[created]} = await db.query('SELECT created_at FROM payments WHERE id=$1',[payment.id]);
+    assert.equal(Date.parse(publicPayment.body.checkout_expires_at)-new Date(created.created_at).getTime(),15*60000);
+    await db.query("UPDATE payments SET created_at=now()-interval '16 minutes' WHERE id=$1",[payment.id]);
+    const closed = await request(`/public/checkout/${checkoutToken}`, '');
+    assert.equal(closed.body.qr,null,'Expired display must not expose QR');
+    await db.query('UPDATE payments SET created_at=$2 WHERE id=$1',[payment.id,created.created_at]);
     assert.ok(!("id" in publicPayment.body));
     assert.ok(!("app_id" in publicPayment.body));
     assert.equal((await request("/public/checkout/guess", "")).status, 404);

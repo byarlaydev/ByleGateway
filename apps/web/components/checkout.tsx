@@ -16,27 +16,49 @@ export default function Checkout({ token }: { token: string }) {
   const [payment, setPayment] = useState<Payment | null>(null),
     [error, setError] = useState(""),
     [qr, setQr] = useState(""),
-    [now, setNow] = useState(0);
+    [now, setNow] = useState(0),
+    [verified, setVerified] = useState(false);
   useEffect(() => {
     let stopped = false;
     let terminal = false;
+    let loading = false;
+    const controller = new AbortController();
+    const cacheKey = 'byle-checkout-' + token;
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
+      if (cached?.currency === 'MMK' && typeof cached.checkout_expires_at === 'string') {
+        setPayment(cached);
+        setNow(Date.now());
+      }
+    } catch {}
     const load = async () => {
+      if (loading || stopped) return;
+      loading = true;
       try {
         const res = await fetch(`/api/checkout/${encodeURIComponent(token)}`, {
           cache: "no-store",
+          signal: controller.signal,
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Checkout is unavailable");
+        if (!res.ok) {
+          if (res.status === 404) {setPayment(null);setVerified(false);sessionStorage.removeItem(cacheKey);}
+          throw new Error(data.message || "Checkout is unavailable");
+        }
+        if (data.currency !== 'MMK') throw new Error('This checkout requires an MMK payment.');
         if (!stopped) {
           setPayment(data);
+          setVerified(true);
+          try {sessionStorage.setItem(cacheKey, JSON.stringify(data));} catch {}
           setError("");
           setNow(Date.now());
           terminal = !["PENDING", "CREATING"].includes(data.status);
         }
       } catch (e) {
         if (!stopped) setError((e as Error).message);
-      }
+      } finally {loading = false;}
     };
+    const resume = () => {if (document.visibilityState === 'visible') {setNow(Date.now());void load();}};
+    document.addEventListener('visibilitychange', resume);
     void load();
     const timer = setInterval(() => {
       if (!terminal && document.visibilityState === "visible") void load();
@@ -44,6 +66,8 @@ export default function Checkout({ token }: { token: string }) {
     const clock = setInterval(() => setNow(Date.now()), 1000);
     return () => {
       stopped = true;
+      controller.abort();
+      document.removeEventListener("visibilitychange", resume);
       clearInterval(timer);
       clearInterval(clock);
     };
@@ -51,8 +75,8 @@ export default function Checkout({ token }: { token: string }) {
   useEffect(() => {
     let active = true;
     setQr("");
-    if (payment?.qr)
-      QRCode.toDataURL(payment.qr, { width: 300, margin: 2 })
+    if (payment?.qr && verified)
+      QRCode.toDataURL(payment.qr, { width: 300, margin: 4 })
         .then((url) => {
           if (active) setQr(url);
         })
@@ -60,7 +84,7 @@ export default function Checkout({ token }: { token: string }) {
     return () => {
       active = false;
     };
-  }, [payment?.qr]);
+  }, [payment?.qr, verified]);
   const remaining = payment
     ? Math.max(
         0,
@@ -69,7 +93,7 @@ export default function Checkout({ token }: { token: string }) {
         ),
       )
     : 0;
-  const paid = payment?.status === "SUCCESS",
+  const paid = verified && payment?.status === "SUCCESS",
     waiting = payment && ["PENDING", "CREATING"].includes(payment.status),
     expired = Boolean(payment && now && remaining === 0);
   return (
@@ -83,7 +107,7 @@ export default function Checkout({ token }: { token: string }) {
           <span className="badge yellow">Sandbox · test payment</span>
         )}
         <h1>
-          {paid
+          {!verified && payment ? "Checking your saved payment." : paid
             ? "Payment received."
             : payment?.status === "REFUNDED"
               ? "Payment refunded."
@@ -107,25 +131,28 @@ export default function Checkout({ token }: { token: string }) {
               {new Intl.NumberFormat("en-US").format(Number(payment.amount))}{" "}
               <small>MMK</small>
             </div>
-            {waiting &&
+            {verified && waiting &&
               !expired &&
               (qr ? (
                 <>
-                  <img
+                  <img className="mmqr-logo" src="/mmqr-logo.png" alt="MyanmarPay MMQR" width={64} height={98} />
+                  <img className="mmqr-code"
                     src={qr}
                     alt={`MMQR payment for ${payment.amount} kyat`}
                     width={300}
                     height={300}
                   />
+                  <p className="payment-attribution">PAYMENT POWERED BY MYANMYANPAY</p>
                   <p>
                     {payment.mode === "sandbox"
                       ? "Simulate this payment in MyanMyanPay’s dashboard. Do not scan it with a live banking app."
                       : "Scan with your supported banking or wallet app."}
                   </p>
-                  <p className="checkout-timer" aria-live="off">
+                  <p className="checkout-timer" role="timer" aria-live="off">
                     QR window: {Math.floor(remaining / 60)}:
                     {String(remaining % 60).padStart(2, "0")}
                   </p>
+                  <a className="secondary checkout-download" href={qr} download="mmqr-payment.png">Download QR</a>
                 </>
               ) : (
                 <p>
@@ -137,7 +164,7 @@ export default function Checkout({ token }: { token: string }) {
                 Your payment is confirmed. You can return to the app.
               </p>
             )}
-            {waiting && expired && (
+            {verified && waiting && expired && (
               <p>
                 This QR is no longer displayed. If you already paid, keep this
                 page open while confirmation arrives. Contact the app before

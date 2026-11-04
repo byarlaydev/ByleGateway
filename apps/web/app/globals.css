@@ -1788,3 +1788,6 @@ td {
     font-size: 13px;
   }
 }
+
+.checkout-card img.mmqr-logo{display:block;width:64px;height:auto;margin:24px auto 12px;object-fit:contain}.checkout-card img.mmqr-code{display:block;width:min(300px,100%);height:auto;margin:0 auto;background:#fff;object-fit:contain}.checkout-card .payment-attribution{font-size:11px;font-weight:700;letter-spacing:.06em;line-height:1.6;margin:14px 0}.checkout-download{display:inline-flex;margin:4px auto 18px}.checkout-card .checkout-timer{font-variant-numeric:tabular-nums;font-size:14px}
+.checkout-card{padding:28px}.checkout-card .checkout-brand{margin-bottom:20px;font-size:28px}.checkout-card h1{margin:18px 0 12px}.checkout-card .detail-amount{margin:18px 0;font-size:32px}.checkout-card img.mmqr-logo{width:48px;margin:16px auto 8px}.checkout-card img.mmqr-code{width:min(260px,100%)}.checkout-card .setting-row strong{overflow-wrap:anywhere}.checkout-card .setting-row{margin:18px 0}
