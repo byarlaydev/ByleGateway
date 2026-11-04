@@ -212,6 +212,7 @@ async function run() {
     assert.equal(new Set(duplicate.map((r) => r.body.id)).size, 1);
     assert.equal(creates, 1);
     const payment = duplicate[0].body;
+    assert.equal(Date.parse(payment.checkout_expires_at) - Date.parse(payment.created_at), 15 * 60 * 1000);
     assert.ok(records.has(providerReference(payment.id)));
     assert.equal(
       (
