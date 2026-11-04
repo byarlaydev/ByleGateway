@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS payments (
 ALTER TABLE apps ADD COLUMN IF NOT EXISTS webhook_url text;
 ALTER TABLE apps ADD COLUMN IF NOT EXISTS webhook_secret text;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS checkout_token text UNIQUE;
-ALTER TABLE payments ADD COLUMN IF NOT EXISTS checkout_expires_at timestamptz NOT NULL DEFAULT (now() + interval '30 minutes');
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS checkout_expires_at timestamptz NOT NULL DEFAULT (now() + interval '15 minutes');
+ALTER TABLE payments ALTER COLUMN checkout_expires_at SET DEFAULT (now() + interval '15 minutes');
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS next_check_at timestamptz NOT NULL DEFAULT (now() + interval '30 seconds');
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS check_attempts integer NOT NULL DEFAULT 0;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS last_error text;
@@ -50,6 +51,9 @@ CREATE TABLE IF NOT EXISTS owner_sessions (
 CREATE INDEX IF NOT EXISTS owner_sessions_expiry_idx ON owner_sessions(expires_at);
 CREATE TABLE IF NOT EXISTS gateway_runtime (id text PRIMARY KEY, last_tick_at timestamptz NOT NULL);
 CREATE TABLE IF NOT EXISTS gateway_migrations (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now());
-INSERT INTO gateway_migrations(version) VALUES(1),(2),(3) ON CONFLICT DO NOTHING;
+UPDATE payments SET checkout_expires_at=created_at+interval '15 minutes'
+ WHERE checkout_expires_at>created_at+interval '15 minutes'
+ AND NOT EXISTS(SELECT 1 FROM gateway_migrations WHERE version=4);
+INSERT INTO gateway_migrations(version) VALUES(1),(2),(3),(4) ON CONFLICT DO NOTHING;
 CREATE INDEX IF NOT EXISTS payments_created_idx ON payments(created_at DESC);
 `;

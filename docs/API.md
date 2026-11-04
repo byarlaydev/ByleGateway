@@ -31,7 +31,7 @@ Payment responses contain `id`, `app_id`, `order_id`, `amount`, `currency`, `sta
 
 `GET /public/checkout/:token` requires the 256-bit capability token embedded in the hosted checkout URL, not an app key. It returns only app display name, order reference, amount/currency, description, status, checkout expiry, and QR data while the checkout window is open and payment is pending. It never returns app keys, internal app/payment IDs, timeline, or customer information. Invalid tokens return 404.
 
-The Next.js checkout is `/checkout/:token`, polling through `/api/checkout/:token` every five seconds. Treat the link as private. No third-party assets or analytics are loaded. The 30-minute display window is not proof of provider expiry or cancellation; late payments are still reconciled. Status may still be read after the QR window closes.
+The Next.js checkout is `/checkout/:token`, polling through `/api/checkout/:token` every five seconds. Treat the link as private. No third-party assets or analytics are loaded. The 15-minute display window is not proof of provider expiry or cancellation; late payments are still reconciled. Status may still be read after the QR window closes.
 
 ## Owner API
 

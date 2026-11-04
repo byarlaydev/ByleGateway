@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
+import PaymentQr from "./payment-qr";
+import { checkoutRemaining } from "../lib/checkout-window";
 type Payment = {
   order_id: string;
   amount: string;
@@ -15,7 +16,6 @@ type Payment = {
 export default function Checkout({ token }: { token: string }) {
   const [payment, setPayment] = useState<Payment | null>(null),
     [error, setError] = useState(""),
-    [qr, setQr] = useState(""),
     [now, setNow] = useState(0);
   useEffect(() => {
     let stopped = false;
@@ -48,26 +48,8 @@ export default function Checkout({ token }: { token: string }) {
       clearInterval(clock);
     };
   }, [token]);
-  useEffect(() => {
-    let active = true;
-    setQr("");
-    if (payment?.qr)
-      QRCode.toDataURL(payment.qr, { width: 300, margin: 2 })
-        .then((url) => {
-          if (active) setQr(url);
-        })
-        .catch(() => setError("QR code could not be rendered"));
-    return () => {
-      active = false;
-    };
-  }, [payment?.qr]);
   const remaining = payment
-    ? Math.max(
-        0,
-        Math.floor(
-          (new Date(payment.checkout_expires_at).getTime() - now) / 1000,
-        ),
-      )
+    ? checkoutRemaining(payment.checkout_expires_at, now)
     : 0;
   const paid = payment?.status === "SUCCESS",
     waiting = payment && ["PENDING", "CREATING"].includes(payment.status),
@@ -109,22 +91,13 @@ export default function Checkout({ token }: { token: string }) {
             </div>
             {waiting &&
               !expired &&
-              (qr ? (
+              (payment.qr ? (
                 <>
-                  <img
-                    src={qr}
-                    alt={`MMQR payment for ${payment.amount} kyat`}
-                    width={300}
-                    height={300}
-                  />
+                  <PaymentQr value={payment.qr} expiresAt={payment.checkout_expires_at} orderId={payment.order_id} />
                   <p>
                     {payment.mode === "sandbox"
                       ? "Simulate this payment in MyanMyanPay’s dashboard. Do not scan it with a live banking app."
                       : "Scan with your supported banking or wallet app."}
-                  </p>
-                  <p className="checkout-timer" aria-live="off">
-                    QR window: {Math.floor(remaining / 60)}:
-                    {String(remaining % 60).padStart(2, "0")}
                   </p>
                 </>
               ) : (

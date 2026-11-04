@@ -45,11 +45,13 @@ Amounts are integers in whole kyat: 25000 means 25,000 MMK. A repeated order wit
 
 ## 3. Open hosted checkout
 
-Store `payment.id` against your app’s order. Return `payment.checkout_url` from your backend and navigate the customer there. The checkout shows amount, order reference, MMQR, and current payment status. It polls automatically and stops displaying QR data after a 30-minute window or terminal status. A closed display window does not cancel the provider payment: late payments may still confirm.
+Store `payment.id` against your app’s order. Return `payment.checkout_url` from your backend and navigate the customer there. The checkout shows amount, order reference, MMQR, and current payment status. It polls automatically and stops displaying QR data after a 15-minute window or terminal status. A closed display window does not cancel the provider payment: late payments may still confirm.
 
 Treat checkout URLs as private bearer links. They contain no app API key and cannot reveal another order without its unguessable token. The gateway does not accept arbitrary return URLs; customers return to your app themselves after completion. This avoids introducing open redirects.
 
-For an embedded flow, `payment.qr` is the raw EMVCo string. Render it with your own QR library, not as an image URL. When status is CREATING or QR is null, show a preparing state and wait for reconciliation.
+Hosted checkout displays the supplied, unmodified MyanmarPay MMQR logo, only MMK amounts, a visible 15-minute countdown/progress indicator, and a functional Download QR link. The exact attribution **PAYMENT POWERED BY MYANMYANPAY** appears directly below the QR. The QR is rendered from the unchanged provider payload with its quiet zone and no logo overlay. The logo asset is available at your gateway origin's `/mmqr-logo.png`.
+
+For an embedded flow, `payment.qr` is the raw EMVCo string. Render it with your own QR library, not as an image URL. Embedded screens must implement the same logo, MMK-only amount, attribution, countdown, and download requirements. When status is CREATING or QR is null, show a preparing state and wait for reconciliation.
 
 ## 4. Receive signed status notifications
 

@@ -16,6 +16,10 @@ test("agent prompt uses the deployment origin and contains the integration contr
     "orderId",
     "REFUNDED",
     "merchant sandbox",
+    "PAYMENT POWERED BY MYANMYANPAY",
+    "Download QR",
+    "15-minute countdown",
+    "unmodified MyanmarPay MMQR logo",
   ])
     assert.ok(prompt.includes(contract), contract);
   assert.ok(!/bg_[a-f0-9]{32,}|whsec_[a-f0-9]{32,}|OWNER_TOKEN/.test(prompt));

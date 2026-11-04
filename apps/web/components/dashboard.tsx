@@ -22,7 +22,7 @@ import {
   Code,
   DotsThree,
 } from "@phosphor-icons/react";
-import QRCode from "qrcode";
+import PaymentQr from "./payment-qr";
 import { AppTools, PaymentTimeline, SetupChecklist } from "./gateway-tools";
 import { integrationPrompt } from "../lib/integration-prompt";
 import type { App, Payment } from "./models";
@@ -66,7 +66,6 @@ export default function Dashboard({ now }: { now: number }) {
   const [appFilter, setAppFilter] = useState("all");
   const [modal, setModal] = useState<"app" | null>(null);
   const [detail, setDetail] = useState<Payment | null>(null);
-  const [qr, setQr] = useState("");
   const [name, setName] = useState("");
   const [newKey, setNewKey] = useState("");
   const [error, setError] = useState("");
@@ -165,13 +164,6 @@ export default function Dashboard({ now }: { now: number }) {
     const timer = setTimeout(() => setToast(""), 3500);
     return () => clearTimeout(timer);
   }, [toast]);
-  useEffect(() => {
-    setQr("");
-    if (detail?.qr)
-      QRCode.toDataURL(detail.qr, { width: 260, margin: 2 })
-        .then(setQr)
-        .catch(() => setError("Unable to render QR code"));
-  }, [detail]);
 
   useEffect(() => {
     if (!modal && !newKey && !detail) return;
@@ -1008,15 +1000,12 @@ export default function Dashboard({ now }: { now: number }) {
                     <strong>{v}</strong>
                   </div>
                 ))}
-                {qr && (
-                  <div className="qr">
-                    <img
-                      src={qr}
-                      alt="Payment MMQR code"
-                      width={260}
-                      height={260}
-                    />
-                  </div>
+                {detail.qr && ["PENDING", "CREATING"].includes(detail.status) && (
+                  <PaymentQr
+                    value={detail.qr}
+                    expiresAt={detail.checkout_expires_at || new Date(Date.parse(detail.created_at) + 15 * 60 * 1000).toISOString()}
+                    orderId={detail.order_id}
+                  />
                 )}
                 <button
                   className="secondary"
