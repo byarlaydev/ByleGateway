@@ -1,5 +1,17 @@
-import { ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, ServiceUnavailableException } from "@nestjs/common";
 import { MMPaySDK } from "mmpay-node-sdk";
+// MyanMyanPay accepts at most 32 characters; retain the complete UUID without hyphens.
+export function providerReference(id: string) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))
+    throw new BadRequestException("Invalid payment identifier");
+  return id.replace(/-/g, "").toLowerCase();
+}
+export function gatewayReference(id: string) {
+  if (/^[0-9a-f]{32}$/i.test(id))
+    return `${id.slice(0,8)}-${id.slice(8,12)}-${id.slice(12,16)}-${id.slice(16,20)}-${id.slice(20)}`.toLowerCase();
+  providerReference(id);
+  return id.toLowerCase();
+}
 export function provider() {
   const {
     MMPAY_APP_ID: appId,
