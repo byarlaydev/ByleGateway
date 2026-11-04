@@ -26,7 +26,7 @@ import { assertSame, equal, hash, paymentInput, publicHttpsOrigin, verifyCallbac
 import { provider, providerMode, upstream } from "./provider";
 import { checkout, event, find, reconcile, uuid } from "./payments";
 import { startWorker } from "./worker";
-import { seal, validateWebhookUrl } from "./webhooks";
+import { seal, approveWebhookUrl } from "./webhooks";
 const owner = (req: Request) => {
   if (
     !process.env.OWNER_TOKEN ||
@@ -365,7 +365,7 @@ class GatewayController {
   ) {
     owner(req);
     uuid(id);
-    const url = body?.url === "" ? null : validateWebhookUrl(body?.url);
+    const url = body?.url === "" ? null : await approveWebhookUrl(body?.url);
     const secret = url ? `whsec_${randomBytes(32).toString("hex")}` : null;
     const { rows } = await db.query(
       "UPDATE apps SET webhook_url=$2,webhook_secret=$3 WHERE id=$1 RETURNING id,webhook_url",

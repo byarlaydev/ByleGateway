@@ -109,13 +109,7 @@ export function deliverySignature(
     .update(`${timestamp}.${payload}`)
     .digest("hex");
 }
-export async function sendWebhook(
-  urlValue: string,
-  encryptedSecret: string,
-  payload: string,
-  id: string,
-): Promise<number> {
-  const url = new URL(validateWebhookUrl(urlValue));
+async function webhookAddresses(url: URL) {
   let dnsTimer: ReturnType<typeof setTimeout> | undefined;
   let addresses: Awaited<ReturnType<typeof lookup>>[];
   try {
@@ -125,6 +119,8 @@ export async function sendWebhook(
         dnsTimer = setTimeout(() => reject(new Error("DNS timeout")), 5000);
       }),
     ]);
+  } catch {
+    throw new BadRequestException("Cannot resolve webhook hostname. Check the URL and try again.");
   } finally {
     clearTimeout(dnsTimer);
   }
@@ -132,7 +128,22 @@ export async function sendWebhook(
     !addresses.length ||
     addresses.some((a) => !publicAddress(a.address, a.family))
   )
-    throw new Error("Blocked webhook address");
+    throw new BadRequestException("Webhook must resolve only to public internet addresses. Private and local addresses are blocked.");
+  return addresses;
+}
+export async function approveWebhookUrl(value: unknown) {
+  const url = validateWebhookUrl(value);
+  await webhookAddresses(new URL(url));
+  return url;
+}
+export async function sendWebhook(
+  urlValue: string,
+  encryptedSecret: string,
+  payload: string,
+  id: string,
+): Promise<number> {
+  const url = new URL(validateWebhookUrl(urlValue));
+  const addresses = await webhookAddresses(url);
   const address = addresses[0],
     timestamp = Math.floor(Date.now() / 1000).toString();
   return new Promise((resolve, reject) => {

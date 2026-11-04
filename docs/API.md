@@ -50,7 +50,7 @@ The Next.js checkout is `/checkout/:token`, polling through `/api/checkout/:toke
 | GET    | `/admin/payments/:id/events`   | Latest 200 timeline events and all delivery summaries                                                     |
 | POST   | `/admin/deliveries/:id/resend` | Requeue original event with original destination/secret; 409 while leased                                 |
 
-Webhook URLs must use HTTPS/443, have no credentials or fragment, and match `WEBHOOK_ALLOWED_HOSTS` exactly. Saving always creates a new signing secret. An empty URL disables **future** notifications; existing queued deliveries retain their snapshot destination/secret. Do not configure secrets in URL query parameters. All owner mutation routes require the owner token; Next.js proxy mutations additionally require same-origin browser requests.
+Webhook URLs must use HTTPS/443, have no credentials or fragment, and match `WEBHOOK_ALLOWED_HOSTS` exactly. Saving validates that every DNS address is public before changing the URL or signing secret. Saving always creates a new signing secret. An empty URL disables **future** notifications; existing queued deliveries retain their snapshot destination/secret. Do not configure secrets in URL query parameters. All owner mutation routes require the owner token; Next.js proxy mutations additionally require same-origin browser requests.
 
 Report query parameters:
 

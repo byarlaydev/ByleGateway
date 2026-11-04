@@ -82,7 +82,7 @@ async function run() {
   await new Promise<void>((resolve) => mock.listen(4401, "127.0.0.1", resolve));
   const server = spawn(
     process.execPath,
-    [resolve(__dirname, "../dist/main.js")],
+    ["--require", resolve(__dirname, "public-dns.cjs"), resolve(__dirname, "../dist/main.js")],
     {
       env: {
         ...process.env,

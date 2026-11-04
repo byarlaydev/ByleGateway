@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import {
   publicAddress,
   validateWebhookUrl,
+  approveWebhookUrl,
   seal,
   unseal,
   deliverySignature,
@@ -43,6 +44,26 @@ test("webhook URLs require approved HTTPS destinations", () => {
   ])
     assert.equal(publicAddress(address, 6), false);
   assert.equal(publicAddress("8.8.8.8", 4), true);
+});
+test("saving an approved webhook rejects unsafe or unavailable DNS", async (t) => {
+  const previous = process.env.WEBHOOK_ALLOWED_HOSTS;
+  t.after(() => {
+    if (previous === undefined) delete process.env.WEBHOOK_ALLOWED_HOSTS;
+    else process.env.WEBHOOK_ALLOWED_HOSTS = previous;
+  });
+  process.env.WEBHOOK_ALLOWED_HOSTS = "mystore-beryl.vercel.app";
+  const dns = (await import("node:dns/promises")).default;
+  const url = "https://mystore-beryl.vercel.app/webhooks/byle";
+  t.mock.method(dns, "lookup", async () => [{ address: "8.8.8.8", family: 4 }]);
+  assert.equal(await approveWebhookUrl(url), url);
+  for (const invalid of ["http://store.example/webhook", "https://store.example:8443", "https://user:pass@store.example", "https://store.example/#secret"])
+    await assert.rejects(() => approveWebhookUrl(invalid));
+  for (const addresses of [[], [{ address: "127.0.0.1", family: 4 }], [{ address: "8.8.8.8", family: 4 }, { address: "10.0.0.1", family: 4 }], [{ address: "::1", family: 6 }]]) {
+    t.mock.method(dns, "lookup", async () => addresses);
+    await assert.rejects(() => approveWebhookUrl(url));
+  }
+  t.mock.method(dns, "lookup", async () => { throw new Error("ENOTFOUND"); });
+  await assert.rejects(() => approveWebhookUrl(url), /Cannot resolve/);
 });
 test("webhook secrets are authenticated encrypted and signatures cover exact bytes", () => {
   process.env.WEBHOOK_ENCRYPTION_KEY = randomBytes(32).toString("hex");

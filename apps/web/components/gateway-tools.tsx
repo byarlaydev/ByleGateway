@@ -76,7 +76,8 @@ export function AppTools({
           />
         </label>
         <p>
-          Saving generates a new signing secret. Empty the URL to disable future
+          Paste your app’s public HTTPS endpoint on an approved hostname. Saving
+          checks its public address and generates a signing secret. Empty the URL to disable future
           notifications. Queued deliveries keep their original destination and
           secret.
         </p>
