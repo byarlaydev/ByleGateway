@@ -51,6 +51,18 @@ CREATE TABLE IF NOT EXISTS owner_sessions (
 CREATE INDEX IF NOT EXISTS owner_sessions_expiry_idx ON owner_sessions(expires_at);
 CREATE TABLE IF NOT EXISTS gateway_runtime (id text PRIMARY KEY, last_tick_at timestamptz NOT NULL);
 CREATE TABLE IF NOT EXISTS gateway_migrations (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS owner_mfa (
+ id text PRIMARY KEY DEFAULT 'owner',
+ enabled boolean NOT NULL DEFAULT false, secret text, pending text, pending_until timestamptz,
+ recovery jsonb NOT NULL DEFAULT '[]', last_counter integer NOT NULL DEFAULT 0,
+ failed_attempts integer NOT NULL DEFAULT 0, blocked_until timestamptz NOT NULL DEFAULT 'epoch',
+ version integer NOT NULL DEFAULT 0
+);
+INSERT INTO owner_mfa(id) VALUES('owner') ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS admin_audit (
+ id uuid PRIMARY KEY, action text NOT NULL, detail jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS admin_audit_created_idx ON admin_audit(created_at DESC);
 UPDATE payments SET checkout_expires_at=created_at+interval '15 minutes'
  WHERE checkout_expires_at>created_at+interval '15 minutes'
  AND NOT EXISTS(SELECT 1 FROM gateway_migrations WHERE version=4);

@@ -16,6 +16,7 @@
     "@nestjs/platform-express": "^12.3.2",
     "dotenv": "^17.2.3",
     "mmpay-node-sdk": "^1.0.0",
+    "otpauth": "^9.6.0",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"

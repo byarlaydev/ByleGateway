@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import type { App, Payment } from "./models";
 async function request(path: string, method = "GET", body?: unknown) {
   const res = await fetch("/api/" + path, {
@@ -242,7 +243,7 @@ export function SetupChecklist() {
       {items.map(([key, label]) => (
         <div className="setting-row" key={key}>
           <span>{label}</span>
-          <strong className={checks?.[key] ? "check-ok" : ""}>
+          <strong className={checks?.[key] ? "check-ok" : checks ? "check-warn" : ""}>
             {checks?.[key] ? "Passed" : checks ? "Action needed" : "Checking…"}
           </strong>
         </div>
@@ -257,6 +258,210 @@ export function SetupChecklist() {
           . Confirm the full order in your app before going live.
         </p>
       ) : null}
+    </section>
+  );
+}
+export function MfaSettings() {
+  const [status, setStatus] = useState<{ enabled: boolean; configured: boolean; recoveryRemaining: number } | null>(null),
+    [setup, setSetup] = useState<{ secret: string; uri: string; qr: string } | null>(null),
+    [code, setCode] = useState(""),
+    [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  function load() {
+    request("admin/mfa")
+      .then(setStatus)
+      .catch((e) => setError(e.message));
+  }
+  useEffect(load, []);
+  async function begin() {
+    setBusy(true);
+    setError("");
+    try {
+      const data = await request("admin/mfa/begin", "POST");
+      const qr = await QRCode.toDataURL(data.uri, { width: 240, margin: 2 });
+      setSetup({ ...data, qr });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function enable(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const data = await request("admin/mfa/enable", "POST", { code });
+      setRecoveryCodes(data.codes);
+      setSetup(null);
+      setCode("");
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function disable() {
+    const input = prompt("Enter your current authenticator or recovery code to disable MFA:");
+    if (!input) return;
+    setBusy(true);
+    setError("");
+    try {
+      await request("admin/mfa/disable", "POST", { code: input });
+      setRecoveryCodes(null);
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function regenerateRecovery() {
+    const input = prompt("Enter your current authenticator code to regenerate recovery codes:");
+    if (!input) return;
+    setBusy(true);
+    setError("");
+    try {
+      const data = await request("admin/mfa/recovery", "POST", { code: input });
+      setRecoveryCodes(data.codes);
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel mfa-settings">
+      <div className="card-heading">
+        <div>
+          <h2>Two-factor authentication</h2>
+          <p>Require an authenticator code to sign in, in addition to your owner password.</p>
+        </div>
+      </div>
+      {error && <p role="alert">{error}</p>}
+      {!status ? (
+        <p>Checking status…</p>
+      ) : recoveryCodes ? (
+        <div className="mfa-recovery-reveal">
+          <span className="eyebrow">SAVE THESE CODES</span>
+          <p>
+            Each recovery code works once if you lose access to your authenticator
+            app. They will not be shown again.
+          </p>
+          <pre className="secret">{recoveryCodes.join("\n")}</pre>
+          <button className="secondary" onClick={() => setRecoveryCodes(null)}>
+            I’ve saved these codes
+          </button>
+        </div>
+      ) : !status.configured ? (
+        <p>
+          Set <code>MFA_ENCRYPTION_KEY</code> (32+ characters) on the server and
+          restart to enable two-factor authentication.
+        </p>
+      ) : status.enabled ? (
+        <>
+          <div className="setting-row">
+            <span>Status</span>
+            <strong className="check-ok">Enabled</strong>
+          </div>
+          <div className="setting-row">
+            <span>Unused recovery codes</span>
+            <strong>{status.recoveryRemaining}</strong>
+          </div>
+          <button className="secondary" disabled={busy} onClick={regenerateRecovery}>
+            Regenerate recovery codes
+          </button>
+          <button className="secondary" disabled={busy} onClick={disable}>
+            Disable two-factor authentication
+          </button>
+        </>
+      ) : setup ? (
+        <form onSubmit={enable} className="mfa-enroll">
+          <p>Scan this code with your authenticator app, or enter the secret manually.</p>
+          <img src={setup.qr} width={240} height={240} alt="Authenticator setup QR code" />
+          <p className="mfa-secret secret">
+            Manual entry secret: <code>{setup.secret}</code>
+          </p>
+          <label>
+            Enter the 6-digit code to confirm
+            <input
+              autoFocus
+              required
+              inputMode="numeric"
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="123456"
+            />
+          </label>
+          <div className="checkout-action-row">
+            <button type="button" className="secondary" onClick={() => setSetup(null)} disabled={busy}>
+              Cancel
+            </button>
+            <button className="primary" disabled={busy}>
+              Confirm and enable
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <div className="setting-row">
+            <span>Status</span>
+            <strong>Not enabled</strong>
+          </div>
+          <button className="secondary" disabled={busy} onClick={begin}>
+            Set up two-factor authentication
+          </button>
+        </>
+      )}
+    </section>
+  );
+}
+export function AuditLog() {
+  const [entries, setEntries] = useState<
+      { id: string; action: string; detail: Record<string, unknown>; created_at: string }[] | null
+    >(null),
+    [error, setError] = useState("");
+  function load() {
+    request("admin/audit")
+      .then((data) => setEntries(data.entries))
+      .catch((e) => setError(e.message));
+  }
+  useEffect(load, []);
+  return (
+    <section className="panel audit-log">
+      <div className="card-heading">
+        <div>
+          <h2>Admin activity</h2>
+          <p>Recent sign-ins, key rotations, webhook changes and exports on this gateway.</p>
+        </div>
+        <button className="secondary" onClick={load}>
+          Reload
+        </button>
+      </div>
+      {error && <p role="alert">{error}</p>}
+      {!entries ? (
+        <p>Loading…</p>
+      ) : !entries.length ? (
+        <p>No recorded activity yet.</p>
+      ) : (
+        <div className="timeline">
+          <ol>
+            {entries.map((e) => (
+              <li key={e.id}>
+                <strong>{e.action.replaceAll(".", " · ").replaceAll("_", " ")}</strong>
+                <time>
+                  {new Date(e.created_at).toLocaleString("en-GB", { timeZone: "Asia/Yangon" })}
+                </time>
+                {Object.keys(e.detail).length > 0 && <pre>{JSON.stringify(e.detail, null, 2)}</pre>}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
     </section>
   );
 }

@@ -65,9 +65,9 @@ async function handler(
           },
           429,
         );
-      let password: unknown;
+      let password: unknown, code: unknown;
       try {
-        ({ password } = await req.json());
+        ({ password, code } = await req.json());
       } catch {
         return json({ message: "Invalid JSON" }, 400);
       }
@@ -75,7 +75,15 @@ async function handler(
         limiter.failed(client);
         return json({ message: "Incorrect password" }, 401);
       }
-      const response = await sessionRequest("POST");
+      const response = await sessionRequest(
+        "POST",
+        undefined,
+        typeof code === "string" ? code : undefined,
+      );
+      if (response.status === 401) {
+        limiter.failed(client);
+        return json({ message: "Invalid verification code" }, 401);
+      }
       if (!response.ok)
         return json(
           {
@@ -84,6 +92,7 @@ async function handler(
           503,
         );
       const session = await response.json();
+      if (session.mfaRequired) return json({ mfaRequired: true });
       limiter.succeeded(client);
       const result = json({ ok: true });
       result.cookies.set(sessionCookie, session.token, {
@@ -102,6 +111,12 @@ async function handler(
       route === "admin/setup" ||
       route === "admin/payments/export" ||
       route === "admin/apps" ||
+      route === "admin/audit" ||
+      route === "admin/mfa" ||
+      route === "admin/mfa/begin" ||
+      route === "admin/mfa/enable" ||
+      route === "admin/mfa/disable" ||
+      route === "admin/mfa/recovery" ||
       /^admin\/apps\/[a-f0-9-]+\/(rotate-key|webhook|key)$/.test(route) ||
       /^admin\/payments\/[a-f0-9-]+\/(events|refresh)$/.test(route) ||
       /^admin\/deliveries\/[a-f0-9-]+\/resend$/.test(route)

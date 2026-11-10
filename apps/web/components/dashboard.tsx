@@ -23,7 +23,7 @@ import {
   DotsThree,
 } from "@phosphor-icons/react";
 import PaymentQr from "./payment-qr";
-import { AppTools, PaymentTimeline, SetupChecklist } from "./gateway-tools";
+import { AppTools, AuditLog, MfaSettings, PaymentTimeline, SetupChecklist } from "./gateway-tools";
 import { integrationPrompt } from "../lib/integration-prompt";
 import type { App, Payment } from "./models";
 const nav = [
@@ -146,19 +146,6 @@ export default function Dashboard({ now }: { now: number }) {
     }, 30000);
     return () => clearInterval(timer);
   }, [load]);
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) =>
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) entry.target.classList.add("visible");
-        }),
-      { threshold: 0.05 },
-    );
-    root.current
-      ?.querySelectorAll(".reveal")
-      .forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [page, Boolean(report)]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 3500);
@@ -313,7 +300,7 @@ export default function Dashboard({ now }: { now: number }) {
             Byle<span className="brand-sub">GATEWAY</span>
           </span>
         </a>
-        <div className="workspace-label">PERSONAL WORKSPACE</div>
+        <div className="workspace-label">Workspace</div>
         <nav>
           {nav.map(({ label, icon: Icon }, i) => (
             <button
@@ -324,9 +311,8 @@ export default function Dashboard({ now }: { now: number }) {
                 setSearch("");
               }}
             >
-              <Icon size={19} weight={page === label ? "fill" : "regular"} />
+              <Icon size={16} weight={page === label ? "fill" : "regular"} />
               {label}
-              {label === "Integration" && <span className="nav-arrow">↗</span>}
             </button>
           ))}
         </nav>
@@ -357,9 +343,9 @@ export default function Dashboard({ now }: { now: number }) {
             Workspace <span>/</span> <strong>{page}</strong>
           </div>
           <div className="top-actions">
-            <span className="env-dot" />
-            <span>
-              {`${report?.mode === "sandbox" ? "Sandbox" : report?.mode === "live" ? "Live" : "Setup required"} workspace`}
+            <span className={`env-pill ${report?.mode === "live" ? "live" : report?.mode === "sandbox" ? "sandbox" : "setup"}`}>
+              <span className="env-dot" />
+              {report?.mode === "sandbox" ? "Sandbox" : report?.mode === "live" ? "Live" : "Setup required"}
             </span>
             <button
               className="icon-button"
@@ -372,65 +358,29 @@ export default function Dashboard({ now }: { now: number }) {
           </div>
         </header>
         <main className="content">
-          <div className="page-heading reveal">
+          <div className="page-heading">
             <div>
-              <div className="eyebrow">YOUR PAYMENT WORKSPACE</div>
-              <h1>
-                {page === "Overview"
-                  ? "A clear view of your payments."
-                  : page === "Integration"
-                    ? "Build once. Accept payments anywhere."
-                    : page === "Applications"
-                      ? "One gateway. All your apps."
-                      : page === "API keys"
-                        ? "The keys to your applications."
-                        : page === "Settings"
-                          ? "A little setup. Then you’re ready."
-                          : page === "Needs attention"
-                            ? "Payments that need a closer look."
-                            : "Every payment, accounted for."}
-              </h1>
+              <h1>{page}</h1>
               <p>
                 {page === "Overview"
-                  ? "All your apps, transactions, and payment activity in one quiet place."
+                  ? "Payment activity across all applications · MMK"
                   : page === "Needs attention"
-                    ? "Review delayed confirmations, reconciliation errors, and failed webhook deliveries."
+                    ? "Stale payments, reconciliation errors and failed webhook deliveries"
                     : page === "Transactions"
-                      ? "Search, review, and export payment activity across your applications."
+                      ? "Search, filter and export payment records · MMK"
                       : page === "Integration"
-                        ? "A small, consistent API for every app you build."
+                        ? "Connect an application to the payment API"
                         : page === "Settings"
-                          ? "Your private workspace and payment provider configuration."
-                          : "Manage access to your personal payment infrastructure."}
+                          ? "Provider configuration, security and admin activity"
+                          : page === "API keys"
+                            ? "Rotate, revoke and configure webhooks per application"
+                            : "Applications with access to this gateway"}
               </p>
             </div>
-            <button
-              className="primary"
-              onClick={() => {
-                setModal("app");
-                setError("");
-              }}
-            >
-              <Plus size={16} weight="bold" /> Add application
-            </button>
-          </div>
-          {error && (
-            <div className="error" role="alert">
-              {error}
-              <button onClick={() => setError("")} aria-label="Dismiss error">
-                <X />
-              </button>
-            </div>
-          )}
-          {(page === "Overview" ||
-            page === "Transactions" ||
-            page === "Needs attention") && (
-            <>
-              <div className="section-toolbar reveal">
-                <div className="section-label">
-                  {page === "Overview" ? "Payment overview" : "Payment history"}{" "}
-                  <span className="muted">/ MMK</span>
-                </div>
+            <div className="page-actions">
+              {(page === "Overview" ||
+                page === "Transactions" ||
+                page === "Needs attention") && (
                 <div className="filters">
                   <select
                     aria-label="Filter application"
@@ -454,8 +404,35 @@ export default function Dashboard({ now }: { now: number }) {
                     <option value="365">Last year</option>
                   </select>
                 </div>
-              </div>
-              <section className="stats reveal">
+              )}
+              {(page === "Overview" ||
+                page === "Applications" ||
+                page === "API keys") && (
+                <button
+                  className="primary"
+                  onClick={() => {
+                    setModal("app");
+                    setError("");
+                  }}
+                >
+                  <Plus size={14} weight="bold" /> Add application
+                </button>
+              )}
+            </div>
+          </div>
+          {error && (
+            <div className="error" role="alert">
+              {error}
+              <button onClick={() => setError("")} aria-label="Dismiss error">
+                <X />
+              </button>
+            </div>
+          )}
+          {(page === "Overview" ||
+            page === "Transactions" ||
+            page === "Needs attention") && (
+            <>
+              <section className="stats">
                 <div>
                   <span className="stat-label">
                     Collected volume <ArrowUpRight size={16} />
@@ -511,7 +488,7 @@ export default function Dashboard({ now }: { now: number }) {
                 </div>
               </section>
               {page === "Overview" && (
-                <section className="middle-grid reveal">
+                <section className="middle-grid">
                   <div className="chart-card panel">
                     <div className="card-heading">
                       <div>
@@ -580,28 +557,17 @@ export default function Dashboard({ now }: { now: number }) {
                   </div>
                 </section>
               )}
-              <section className="transactions panel reveal">
-                <div className="card-heading">
-                  <div>
-                    <h2>
-                      {page === "Overview"
-                        ? "Recent transactions"
-                        : "Transactions"}{" "}
-                      <span className="count">{tableTotal}</span>
-                    </h2>
-                    <p>A running record of your payment activity.</p>
-                  </div>
-                  <button className="secondary" onClick={exportCsv}>
-                    <ArrowDown size={15} />
-                    Export CSV
-                  </button>
-                </div>
+              <section className="transactions panel">
                 <div className="table-tools">
+                  <h2>
+                    {page === "Overview" ? "Recent transactions" : "Transactions"}
+                    <span className="count">{tableTotal}</span>
+                  </h2>
                   <label className="search">
-                    <MagnifyingGlass size={17} />
+                    <MagnifyingGlass size={14} />
                     <input
                       aria-label="Search transactions"
-                      placeholder="Search transactions…"
+                      placeholder="Search order, app or ID"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                     />
@@ -625,6 +591,10 @@ export default function Dashboard({ now }: { now: number }) {
                       <option key={s}>{s}</option>
                     ))}
                   </select>
+                  <button className="secondary" onClick={exportCsv}>
+                    <ArrowDown size={14} />
+                    Export
+                  </button>
                 </div>
                 <div className="table-scroll">
                   <table>
@@ -722,10 +692,12 @@ export default function Dashboard({ now }: { now: number }) {
             </>
           )}
           {(page === "Applications" || page === "API keys") && (
-            <section className="panel app-management reveal">
+            <section className="panel app-management">
               <div className="card-heading">
                 <div>
-                  <h2>{page}</h2>
+                  <h2>
+                    Applications <span className="count">{apps.length}</span>
+                  </h2>
                   <p>
                     Each app has an isolated API key. Secret keys are shown only
                     once.
@@ -767,7 +739,7 @@ export default function Dashboard({ now }: { now: number }) {
             </section>
           )}
           {page === "Integration" && (
-            <section className="integration-grid reveal">
+            <section className="integration-grid">
               <div className="panel guide agent-prompt">
                 <div className="card-heading">
                   <div>
@@ -853,7 +825,7 @@ export default function Dashboard({ now }: { now: number }) {
           )}
           {(page === "Settings" || page === "Overview") && <SetupChecklist />}
           {page === "Settings" && (
-            <section className="panel settings reveal">
+            <section className="panel settings">
               <div className="card-heading">
                 <div>
                   <h2>Gateway configuration</h2>
@@ -894,32 +866,8 @@ export default function Dashboard({ now }: { now: number }) {
               </div>
             </section>
           )}
-          {page === "Overview" && (
-            <div className="integration-strip reveal">
-              <div className="integration-icon">
-                <Code size={23} />
-              </div>
-              <div>
-                <h3>Your next app is a few lines away.</h3>
-                <p>
-                  One API. A consistent payment flow for everything you build.
-                </p>
-              </div>
-              <button onClick={() => setPage("Integration")}>
-                Read the integration guide <ArrowUpRight size={16} />
-              </button>
-            </div>
-          )}
-          <footer>
-            <span>
-              <span className="footer-mark">b.</span> Your infrastructure. Your
-              workspace.
-            </span>
-            <span>
-              Powered by MyanMyanPay <span className="footer-divider">/</span>{" "}
-              MMK payments
-            </span>
-          </footer>
+          {page === "Settings" && <MfaSettings />}
+          {page === "Settings" && <AuditLog />}
         </main>
       </div>
       {toast && (

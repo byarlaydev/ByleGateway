@@ -27,6 +27,8 @@ import { provider, providerMode, upstream, providerReference, gatewayReference }
 import { checkout, event, find, reconcile, uuid } from "./payments";
 import { startWorker } from "./worker";
 import { seal, approveWebhookUrl } from "./webhooks";
+import { beginMfa, changeMfa, enableMfa, mfaStatus, verifyOwnerMfa } from "./mfa";
+import { auditLog, recentAudit } from "./audit";
 const owner = (req: Request) => {
   if (
     !process.env.OWNER_TOKEN ||
@@ -90,7 +92,7 @@ function reportFilters(q: Record<string, string>) {
 class GatewayController {
   @Post("admin/sessions") async createSession(
     @Req() req: Request,
-    @Body() body: { credentialVersion?: unknown },
+    @Body() body: { credentialVersion?: unknown; code?: unknown },
   ) {
     owner(req);
     if (
@@ -98,6 +100,15 @@ class GatewayController {
       !/^[a-f0-9]{64}$/.test(body.credentialVersion)
     )
       throw new BadRequestException("Invalid credential revision");
+    const status = await mfaStatus();
+    if (status.enabled) {
+      if (typeof body.code !== "string" || !body.code.trim())
+        return { mfaRequired: true };
+      if (!(await verifyOwnerMfa(body.code))) {
+        await auditLog("session.mfa_failed");
+        throw new UnauthorizedException("Invalid verification code");
+      }
+    }
     const token = randomBytes(32).toString("hex");
     await db.query(
       "DELETE FROM owner_sessions WHERE expires_at<=now() OR credential_version<>$1",
@@ -107,6 +118,7 @@ class GatewayController {
       "INSERT INTO owner_sessions(token_hash,credential_version) VALUES($1,$2)",
       [hash(token), body.credentialVersion],
     );
+    await auditLog("session.created");
     return { token };
   }
   @Get("admin/sessions/current") async session(@Req() req: Request) {
@@ -127,11 +139,45 @@ class GatewayController {
     await db.query("DELETE FROM owner_sessions WHERE token_hash=$1", [
       hash(String(req.headers["x-owner-session"] || "")),
     ]);
+    await auditLog("session.signed_out");
     return { revoked: true };
   }
   @Get("health") async health() {
     await db.query("SELECT 1");
     return { status: "ok" };
+  }
+  @Get("admin/mfa") async mfa(@Req() req: Request) {
+    owner(req);
+    return mfaStatus();
+  }
+  @Post("admin/mfa/begin") @HttpCode(200) async mfaBegin(@Req() req: Request) {
+    owner(req);
+    return beginMfa();
+  }
+  @Post("admin/mfa/enable") @HttpCode(200) async mfaEnable(
+    @Req() req: Request,
+    @Body() body: { code?: unknown },
+  ) {
+    owner(req);
+    return enableMfa(body?.code);
+  }
+  @Post("admin/mfa/disable") @HttpCode(200) async mfaDisable(
+    @Req() req: Request,
+    @Body() body: { code?: unknown },
+  ) {
+    owner(req);
+    return changeMfa("disable", body?.code);
+  }
+  @Post("admin/mfa/recovery") @HttpCode(200) async mfaRecovery(
+    @Req() req: Request,
+    @Body() body: { code?: unknown },
+  ) {
+    owner(req);
+    return changeMfa("recovery", body?.code);
+  }
+  @Get("admin/audit") async audit(@Req() req: Request) {
+    owner(req);
+    return { entries: await recentAudit(100) };
   }
   @Get("admin/overview") async overview(
     @Req() req: Request,
@@ -193,6 +239,7 @@ class GatewayController {
     @Query() query: Record<string, string>,
   ) {
     owner(req);
+    await auditLog("payments.exported", { filters: query });
     const f = reportFilters(query);
     const client = await db.connect();
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -343,6 +390,7 @@ class GatewayController {
     await event(rows[0].payment_id, "webhook.resend_requested", {
       deliveryId: id,
     });
+    await auditLog("delivery.resend", { deliveryId: id });
     return { queued: true };
   }
   @Post("admin/apps/:id/rotate-key") async rotate(
@@ -356,6 +404,7 @@ class GatewayController {
       [uuid(id), hash(key), key.slice(0, 11)],
     );
     if (!rows[0]) throw new NotFoundException();
+    await auditLog("app.key_rotated", { appId: id });
     return { ...rows[0], key };
   }
   @Post("admin/apps/:id/webhook") async webhookConfig(
@@ -372,6 +421,7 @@ class GatewayController {
       [id, url, secret ? seal(secret) : null],
     );
     if (!rows[0]) throw new NotFoundException();
+    await auditLog("app.webhook_updated", { appId: id, url });
     return { ...rows[0], secret };
   }
   @Get("public/checkout/:token") async publicCheckout(
@@ -403,6 +453,7 @@ class GatewayController {
       "INSERT INTO apps(id,name,key_hash,key_prefix) VALUES($1,$2,$3,$4) RETURNING id,name,key_prefix,active,created_at",
       [randomUUID(), body.name.trim(), hash(key), key.slice(0, 11)],
     );
+    await auditLog("app.created", { appId: rows[0].id, name: rows[0].name });
     return { ...rows[0], key };
   }
   @Delete("admin/apps/:id/key") async revoke(
@@ -415,6 +466,7 @@ class GatewayController {
       [uuid(id)],
     );
     if (!result.rowCount) throw new NotFoundException();
+    await auditLog("app.revoked", { appId: id });
     return { revoked: true };
   }
   @Post("v1/payments") async createPayment(
@@ -521,6 +573,7 @@ class GatewayController {
     @Param("id") id: string,
   ) {
     owner(req);
+    await auditLog("payment.manual_refresh", { paymentId: id });
     return checkout(await reconcile(id));
   }
   @Post("webhooks/mmpay") @HttpCode(200) async callback(

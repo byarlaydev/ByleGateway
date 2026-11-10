@@ -27,7 +27,7 @@ export function passwordMatches(password: unknown) {
     Buffer.from(candidate, "hex"),
   );
 }
-export async function sessionRequest(method: string, token?: string) {
+export async function sessionRequest(method: string, token?: string, code?: string) {
   const version = credentialVersion();
   return fetch(
     `${process.env.API_ORIGIN || "http://127.0.0.1:4000"}/admin/sessions${method === "POST" ? "" : "/current"}`,
@@ -41,7 +41,7 @@ export async function sessionRequest(method: string, token?: string) {
       },
       body:
         method === "POST"
-          ? JSON.stringify({ credentialVersion: version })
+          ? JSON.stringify({ credentialVersion: version, code })
           : undefined,
       cache: "no-store",
       signal: AbortSignal.timeout(10000),

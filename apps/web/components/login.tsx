@@ -2,6 +2,8 @@
 import { useState } from "react";
 export default function Login() {
   const [password, setPassword] = useState(""),
+    [code, setCode] = useState(""),
+    [mfaRequired, setMfaRequired] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   async function submit(e: React.FormEvent) {
@@ -12,10 +14,15 @@ export default function Login() {
       const response = await fetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, code: mfaRequired ? code : undefined }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Sign-in failed");
+      if (data.mfaRequired) {
+        setMfaRequired(true);
+        setBusy(false);
+        return;
+      }
       window.location.replace("/");
     } catch (e) {
       setError((e as Error).message);
@@ -24,7 +31,7 @@ export default function Login() {
   }
   return (
     <main className="login-shell">
-      <section className="login-intro">
+      <section className="panel login-card">
         <a className="brand" href="/login">
           <span className="brand-mark">
             b<span>.</span>
@@ -33,31 +40,13 @@ export default function Login() {
             Byle<span className="brand-sub">GATEWAY</span>
           </span>
         </a>
-        <div className="eyebrow">YOUR PRIVATE PAYMENT WORKSPACE</div>
-        <h1>
-          One home for
-          <br />
-          your payments.
-        </h1>
-        <p>
-          Manage your applications, follow each payment, and keep your
-          integrations running.
-        </p>
-        <div className="login-footnote">
-          Next.js · NestJS · PostgreSQL
-          <br />
-          Payments processed by MyanMyanPay
-        </div>
-      </section>
-      <section className="panel login-card">
-        <div className="eyebrow">OWNER ACCESS</div>
-        <h2>Sign in to your gateway.</h2>
-        <p>Your applications and payment history are private.</p>
+        <h1>Sign in</h1>
+        <p>Owner access to your payment workspace.</p>
         <form onSubmit={submit}>
           <label className="form-label">
             Owner password
             <input
-              autoFocus
+              autoFocus={!mfaRequired}
               required
               type="password"
               autoComplete="current-password"
@@ -65,21 +54,38 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your owner password"
+              readOnly={mfaRequired}
             />
           </label>
+          {mfaRequired && (
+            <label className="form-label">
+              Authenticator code
+              <input
+                autoFocus
+                required
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={100}
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="6-digit code or recovery code"
+              />
+            </label>
+          )}
           {error && (
             <p className="form-error" role="alert">
               {error}
             </p>
           )}
           <button className="primary" disabled={busy}>
-            {busy ? "Signing in…" : "Sign in"}
+            {busy ? "Signing in…" : mfaRequired ? "Verify code" : "Sign in"}
           </button>
         </form>
         <p className="login-help">
-          Use the owner password configured on your server. If you are setting
-          up this gateway for the first time, follow the installation guide in
-          the project README.
+          {mfaRequired
+            ? "Enter the 6-digit code from your authenticator app, or one of your recovery codes."
+            : "Use the owner password configured on your server. If you are setting up this gateway for the first time, follow the installation guide in the project README."}
         </p>
       </section>
     </main>
