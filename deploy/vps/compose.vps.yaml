@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: byle
+      POSTGRES_USER: byle
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong hexadecimal admin database password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U byle -d byle"]
+      interval: 5s
+      retries: 10
+  migrate:
+    build:
+      context: .
+      target: api
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://byle:${POSTGRES_PASSWORD}@postgres:5432/byle
+      RUNTIME_DATABASE_PASSWORD: ${RUNTIME_DATABASE_PASSWORD:?Set a separate random hexadecimal runtime database password}
+    command: ["node", "dist/migrate.js"]
+    working_dir: /app/apps/api
+    depends_on:
+      postgres:
+        condition: service_healthy
+  api:
+    build:
+      context: .
+      target: api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://byle_app:${RUNTIME_DATABASE_PASSWORD}@postgres:5432/byle
+      OWNER_TOKEN: ${OWNER_TOKEN:?Set OWNER_TOKEN}
+      WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?Set WEBHOOK_ENCRYPTION_KEY}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      WEBHOOK_ALLOWED_HOSTS: ${WEBHOOK_ALLOWED_HOSTS:-}
+      MMPAY_APP_ID: ${MMPAY_APP_ID:-}
+      MMPAY_PUBLISHABLE_KEY: ${MMPAY_PUBLISHABLE_KEY:-}
+      MMPAY_SECRET_KEY: ${MMPAY_SECRET_KEY:-}
+      MMPAY_API_BASE_URL: ${MMPAY_API_BASE_URL:-}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:?Set the public HTTPS API origin}
+      CHECKOUT_ORIGIN: ${CHECKOUT_ORIGIN:?Set the public HTTPS checkout origin}
+      WORKER_ENABLED: "true"
+      API_BIND_ADDRESS: 0.0.0.0
+      PORT: 4000
+    ports:
+      - "127.0.0.1:4100:4000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    environment:
+      OWNER_TOKEN: ${OWNER_TOKEN:?Set OWNER_TOKEN}
+      OWNER_PASSWORD: ${OWNER_PASSWORD:?Set a long unique owner password}
+      API_ORIGIN: http://api:4000
+      TRUST_PROXY: "true"
+    ports:
+      - "127.0.0.1:3101:3000"
+    depends_on:
+      - api
+volumes:
+  postgres_data:
